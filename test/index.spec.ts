@@ -19,9 +19,23 @@ async function sha256Base64Url(input: string): Promise<string> {
 	return base64UrlEncode(new Uint8Array(digest));
 }
 
-function safePrefixComponent(value: string): string {
+function safeKeySegment(value: string): string {
 	const cleaned = value.replace(/[^a-zA-Z0-9._-]+/g, '_').replace(/^_+|_+$/g, '');
 	return cleaned.length > 0 ? cleaned : 'root';
+}
+
+function buildReadablePrefixFromPathname(pathname: string, maxLen = 160): string {
+	const segments = pathname.split('/').filter(Boolean).map(safeKeySegment);
+	if (segments.length === 0) return 'root';
+
+	let out = '';
+	for (const seg of segments) {
+		const candidate = out.length === 0 ? seg : `${out}/${seg}`;
+		if (candidate.length > maxLen) break;
+		out = candidate;
+	}
+
+	return out.length > 0 ? out : 'root';
 }
 
 describe('Proxy + R2 logging worker', () => {
@@ -89,7 +103,7 @@ describe('Proxy + R2 logging worker', () => {
 		expect(calledWith.headers.get('x-req')).toBe('abc');
 
 		const url = new URL(incomingUrl);
-		const readable = safePrefixComponent(`${url.hostname}${url.pathname}`.slice(0, 160));
+		const readable = buildReadablePrefixFromPathname(url.pathname, 160);
 		const urlHash = (await sha256Base64Url(incomingUrl)).slice(0, 16);
 		const prefix = `${readable}/${ticks}_${urlHash}`;
 
