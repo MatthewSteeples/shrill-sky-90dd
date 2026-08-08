@@ -11,7 +11,8 @@
 		"enabled": true
 	},
 	"vars": {
-		"UPSTREAM_BASE_URL": "https://quickbooks.api.intuit.com"
+		"UPSTREAM_BASE_URL": "https://quickbooks.api.intuit.com",
+		"ERROR_PERCENTAGE": 0
 	},
 	"r2_buckets": [
 		{

@@ -44,7 +44,59 @@ describe('Proxy + R2 logging worker', () => {
 		vi.restoreAllMocks();
 	});
 
-	it('proxies to configured upstream and writes 4 log blobs to R2', async () => {
+	it('returns 500 when ERROR_PERCENTAGE causes a random error', async () => {
+		vi.spyOn(Math, 'random').mockReturnValue(0.1); // 10 < 50 → error triggered
+
+		const fakeBucket = { put: vi.fn() } as unknown as R2Bucket;
+		const request = new IncomingRequest('http://incoming.test/api');
+		const ctx = createExecutionContext();
+		const response = await worker.fetch(
+			request,
+			{ UPSTREAM_BASE_URL: 'https://example.com', LOGS_BUCKET: fakeBucket, ERROR_PERCENTAGE: 50 } as any,
+			ctx,
+		);
+
+		expect(response.status).toBe(500);
+		expect(await response.text()).toBe('Internal Server Error');
+	});
+
+	it('does not return 500 when ERROR_PERCENTAGE is 0', async () => {
+		vi.spyOn(Math, 'random').mockReturnValue(0); // would trigger if percentage > 0
+
+		const fetchMock = vi.fn(async () => new Response('ok', { status: 200 }));
+		vi.stubGlobal('fetch', fetchMock as unknown as typeof fetch);
+
+		const fakeBucket = { put: vi.fn(async () => ({})) } as unknown as R2Bucket;
+		const request = new IncomingRequest('http://incoming.test/api');
+		const ctx = createExecutionContext();
+		const response = await worker.fetch(
+			request,
+			{ UPSTREAM_BASE_URL: 'https://example.com', LOGS_BUCKET: fakeBucket, ERROR_PERCENTAGE: 0 } as any,
+			ctx,
+		);
+		await waitOnExecutionContext(ctx);
+
+		expect(response.status).toBe(200);
+	});
+
+	it('does not return 500 when random value is above ERROR_PERCENTAGE threshold', async () => {
+		vi.spyOn(Math, 'random').mockReturnValue(0.9); // 90 >= 50 → no error
+
+		const fetchMock = vi.fn(async () => new Response('ok', { status: 200 }));
+		vi.stubGlobal('fetch', fetchMock as unknown as typeof fetch);
+
+		const fakeBucket = { put: vi.fn(async () => ({})) } as unknown as R2Bucket;
+		const request = new IncomingRequest('http://incoming.test/api');
+		const ctx = createExecutionContext();
+		const response = await worker.fetch(
+			request,
+			{ UPSTREAM_BASE_URL: 'https://example.com', LOGS_BUCKET: fakeBucket, ERROR_PERCENTAGE: 50 } as any,
+			ctx,
+		);
+		await waitOnExecutionContext(ctx);
+
+		expect(response.status).toBe(200);
+	});
 		const ticks = 1700000000123;
 		vi.stubGlobal('Date', class extends Date {
 			static now() {

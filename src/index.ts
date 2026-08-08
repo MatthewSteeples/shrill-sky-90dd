@@ -14,6 +14,7 @@
 type WorkerEnv = {
 	UPSTREAM_BASE_URL: string;
 	LOGS_BUCKET: R2Bucket;
+	ERROR_PERCENTAGE: number;
 };
 
 function joinPath(basePathname: string, requestPathname: string): string {
@@ -120,6 +121,11 @@ export default {
 		}
 		if (!env.LOGS_BUCKET) {
 			return new Response('Missing required binding: LOGS_BUCKET', { status: 500 });
+		}
+
+		const errorPercentage = Number(env.ERROR_PERCENTAGE) || 0;
+		if (errorPercentage > 0 && Math.random() * 100 < errorPercentage) {
+			return new Response('Internal Server Error', { status: 500 });
 		}
 
 		const baseUrl = new URL(upstreamBase);
