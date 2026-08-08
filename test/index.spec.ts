@@ -97,6 +97,8 @@ describe('Proxy + R2 logging worker', () => {
 
 		expect(response.status).toBe(200);
 	});
+
+	it('proxies to configured upstream and writes 4 log blobs to R2', async () => {
 		const ticks = 1700000000123;
 		vi.stubGlobal('Date', class extends Date {
 			static now() {
