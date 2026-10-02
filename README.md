@@ -69,9 +69,73 @@ By default Wrangler serves the worker at `http://localhost:8787`.
 
 ## Deploy
 
+The default deployment remains `shrill-sky-90dd`, pointing to QuickBooks and
+using `shrill-sky-90dd-logs`:
+
 ```bash
 npm run deploy
 ```
+
+### Named environments
+
+Three additional environments deploy the same code as separate Workers with
+isolated R2 log buckets. Environment names are case-sensitive.
+
+| Environment | Worker name | Upstream base URL | R2 log bucket |
+| --- | --- | --- | --- |
+| `Qbo` | `shrill-sky-90dd-qbo` | `https://quickbooks.api.intuit.com` | `shrill-sky-90dd-qbo-logs` |
+| `Xero` | `shrill-sky-90dd-xero` | `https://api.xero.com` | `shrill-sky-90dd-xero-logs` |
+| `SageCloud` | `shrill-sky-90dd-sagecloud` | `https://api.accounting.sage.com/` | `shrill-sky-90dd-sagecloud-logs` |
+
+Each environment explicitly defines `UPSTREAM_BASE_URL`, `ERROR_PERCENTAGE`
+(initially `0`), and `LOGS_BUCKET` because variables and bindings are not
+inherited from the default configuration.
+
+Worker names are explicitly lowercase to meet Cloudflare's naming requirements.
+The three named-environment buckets have lifecycle rules to delete all objects
+after 14 days, while preserving the default seven-day incomplete multipart
+upload cleanup. These rules are configured on the buckets, not in Wrangler.
+Deletion is asynchronous and typically occurs within 24 hours of expiration.
+
+Create the buckets once before the first deployment:
+
+```bash
+npx wrangler r2 bucket create shrill-sky-90dd-qbo-logs
+npx wrangler r2 bucket create shrill-sky-90dd-xero-logs
+npx wrangler r2 bucket create shrill-sky-90dd-sagecloud-logs
+```
+
+Deploy each environment:
+
+```bash
+npm run deploy -- --env Qbo
+npm run deploy -- --env Xero
+npm run deploy -- --env SageCloud
+```
+
+For local development, use `npm run dev -- --env Qbo` (or the other environment
+names).
+
+### Cloudflare Workers Builds
+
+After the initial deployments, connect the same repository to each new Worker
+under **Settings > Builds**, with production branch `master` and the repository
+root as the root directory. Leave the build command empty; Wrangler bundles the
+TypeScript.
+
+Set each Worker's deploy command to the matching `npm run deploy -- --env ...`
+command above. Leave the existing Worker's deploy command as `npm run deploy`.
+Pushes to `master` will then trigger independent deployments for all connected
+Workers.
+
+If preview builds are enabled, also add the matching `--env Qbo`, `--env Xero`,
+or `--env SageCloud` flag to the preview command. For example,
+`npx wrangler preview --env Qbo`; if using `npx wrangler versions upload`,
+append the same environment flag to that command instead.
+
+Keep runtime variables and bindings in `wrangler.jsonc`; build variables are
+only available during CI, not at runtime. Configure any runtime secrets
+separately for each Worker.
 
 ## Test
 
