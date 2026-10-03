@@ -15,6 +15,16 @@ Cloudflare Worker that forwards incoming HTTP requests to an upstream API and wr
 
 Each log set is written under a deterministic prefix based on request path + timestamp + URL hash.
 
+When `LOG_PATH_HEADER` is configured and the request includes a non-empty value
+for that header, the value becomes the first segment of the R2 log path:
+`<tenant-id>/<request-path>/<timestamp>_<url-hash>/request-headers.txt` (and the
+other three log files). Header names are case-insensitive, and tenant IDs use
+the same path-segment sanitization as request paths: characters outside
+`a-z`, `A-Z`, `0-9`, `.`, `_`, and `-` become underscores, leading/trailing
+underscores are removed, and an empty sanitized segment becomes `root`.
+If the setting or header value is absent or empty, the existing log path is
+unchanged. The upstream URL and forwarded headers are unaffected.
+
 ## Tech stack
 
 - Cloudflare Workers
@@ -59,6 +69,9 @@ Current required bindings/config:
 - `UPSTREAM_BASE_URL` (string)
 - `LOGS_BUCKET` (R2 bucket binding)
 
+Optional config: `LOG_PATH_HEADER` (string) selects the request header used to
+group R2 logs by company/tenant.
+
 ## Run locally
 
 ```bash
@@ -90,6 +103,11 @@ isolated R2 log buckets. Environment names are case-sensitive.
 Each environment explicitly defines `UPSTREAM_BASE_URL`, `ERROR_PERCENTAGE`
 (initially `0`), and `LOGS_BUCKET` because variables and bindings are not
 inherited from the default configuration.
+
+`Xero` also sets `LOG_PATH_HEADER` to `Xero-tenant-id`, and `SageCloud` sets it
+to `x-business`. QBO and the default environment leave it unset because the
+company ID is already in the URL. Only the configured header is checked, so
+another provider's header cannot affect log grouping.
 
 Worker names are explicitly lowercase to meet Cloudflare's naming requirements.
 The three named-environment buckets have lifecycle rules to delete all objects

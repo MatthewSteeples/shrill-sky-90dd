@@ -15,6 +15,7 @@ type WorkerEnv = {
 	UPSTREAM_BASE_URL: string;
 	LOGS_BUCKET: R2Bucket;
 	ERROR_PERCENTAGE: number;
+	LOG_PATH_HEADER?: string;
 };
 
 function joinPath(basePathname: string, requestPathname: string): string {
@@ -64,11 +65,12 @@ function buildReadablePrefixFromPathname(pathname: string, maxLen = 160): string
 	return out.length > 0 ? out : 'root';
 }
 
-async function computeLogPrefix(requestUrl: string, ticks: number): Promise<string> {
+async function computeLogPrefix(requestUrl: string, ticks: number, tenantId: string | null): Promise<string> {
 	const url = new URL(requestUrl);
 	const readable = buildReadablePrefixFromPathname(url.pathname, 160);
 	const urlHash = (await sha256Base64Url(requestUrl)).slice(0, 16);
-	return `${readable}/${ticks}_${urlHash}`;
+	const tenantPrefix = tenantId ? `${safeKeySegment(tenantId)}/` : '';
+	return `${tenantPrefix}${readable}/${ticks}_${urlHash}`;
 }
 
 async function writeProxyLogs(params: {
@@ -138,7 +140,8 @@ export default {
 		upstreamUrl.pathname = joinPath(baseUrl.pathname || '/', incomingUrl.pathname);
 
 		const ticks = Date.now();
-		const logPrefixPromise = computeLogPrefix(request.url, ticks);
+		const tenantId = env.LOG_PATH_HEADER ? request.headers.get(env.LOG_PATH_HEADER) : null;
+		const logPrefixPromise = computeLogPrefix(request.url, ticks, tenantId);
 
 		const requestForUpstream = request.clone();
 		const requestForLog = request.clone();
