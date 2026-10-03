@@ -44,6 +44,99 @@ describe('Proxy + R2 logging worker', () => {
 		vi.restoreAllMocks();
 	});
 
+	it.each<{
+		name: string;
+		header: string | undefined;
+		headers: Record<string, string>;
+		tenantPrefix: string;
+	}>([
+		{
+			name: 'Sage business',
+			header: 'x-business',
+			headers: { 'x-business': 'business-123' },
+			tenantPrefix: 'business-123/',
+		},
+		{
+			name: 'Xero tenant with case-insensitive header name',
+			header: 'Xero-tenant-id',
+			headers: { 'xero-TENANT-ID': 'tenant-456' },
+			tenantPrefix: 'tenant-456/',
+		},
+		{
+			name: 'only the configured header when both are present',
+			header: 'Xero-tenant-id',
+			headers: { 'Xero-tenant-id': 'tenant-456', 'x-business': 'business-123' },
+			tenantPrefix: 'tenant-456/',
+		},
+		{
+			name: 'missing configured header',
+			header: 'x-business',
+			headers: { 'Xero-tenant-id': 'tenant-456' },
+			tenantPrefix: '',
+		},
+		{
+			name: 'empty configured header',
+			header: 'x-business',
+			headers: { 'x-business': '' },
+			tenantPrefix: '',
+		},
+		{
+			name: 'no header configuration for QBO',
+			header: undefined,
+			headers: { 'x-business': 'business-123', 'Xero-tenant-id': 'tenant-456' },
+			tenantPrefix: '',
+		},
+		{
+			name: 'tenant value sanitized into a single segment',
+			header: 'x-business',
+			headers: { 'x-business': '/business/123?' },
+			tenantPrefix: 'business_123/',
+		},
+	])('uses the expected log path for $name without changing the upstream request', async ({
+		header,
+		headers,
+		tenantPrefix,
+	}) => {
+		const ticks = 1700000000123;
+		vi.spyOn(Date, 'now').mockReturnValue(ticks);
+		const fetchMock = vi.fn(async (_request: Request) => new Response('ok'));
+		vi.stubGlobal('fetch', fetchMock);
+		const put = vi.fn(async () => ({}));
+		const fakeBucket = { put } as unknown as R2Bucket;
+		const incomingUrl = 'http://incoming.test/api/invoices?x=1';
+		const request = new IncomingRequest(incomingUrl, {
+			method: 'POST',
+			headers,
+			body: 'request-body',
+		});
+		const ctx = createExecutionContext();
+
+		const response = await worker.fetch(request, {
+			UPSTREAM_BASE_URL: 'https://example.com/base',
+			ERROR_PERCENTAGE: 0,
+			LOGS_BUCKET: fakeBucket,
+			LOG_PATH_HEADER: header,
+		}, ctx);
+		await waitOnExecutionContext(ctx);
+
+		expect(await response.text()).toBe('ok');
+		expect(fetchMock).toHaveBeenCalledTimes(1);
+		const upstreamRequest = fetchMock.mock.calls[0][0];
+		expect(upstreamRequest.url).toBe('https://example.com/base/api/invoices?x=1');
+		expect(upstreamRequest.method).toBe('POST');
+		expect([...upstreamRequest.headers]).toEqual([...request.headers]);
+		expect(await upstreamRequest.text()).toBe('request-body');
+
+		const urlHash = (await sha256Base64Url(incomingUrl)).slice(0, 16);
+		const prefix = `${tenantPrefix}api/invoices/${ticks}_${urlHash}`;
+		expect(put).toHaveBeenCalledTimes(4);
+		for (const filename of ['request-headers', 'request-body', 'response-headers', 'response-body']) {
+			expect(put).toHaveBeenCalledWith(`${prefix}/${filename}.txt`, expect.any(String), {
+				httpMetadata: { contentType: 'text/plain; charset=utf-8' },
+			});
+		}
+	});
+
 	it('returns 500 when ERROR_PERCENTAGE causes a random error', async () => {
 		vi.spyOn(Math, 'random').mockReturnValue(0.1); // 10 < 50 → error triggered
 

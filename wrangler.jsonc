@@ -38,6 +38,7 @@
 			"name": "shrill-sky-90dd-xero",
 			"vars": {
 				"UPSTREAM_BASE_URL": "https://api.xero.com",
+				"LOG_PATH_HEADER": "Xero-tenant-id",
 				"ERROR_PERCENTAGE": 0
 			},
 			"r2_buckets": [
@@ -51,6 +52,7 @@
 			"name": "shrill-sky-90dd-sagecloud",
 			"vars": {
 				"UPSTREAM_BASE_URL": "https://api.accounting.sage.com/",
+				"LOG_PATH_HEADER": "x-business",
 				"ERROR_PERCENTAGE": 0
 			},
 			"r2_buckets": [
