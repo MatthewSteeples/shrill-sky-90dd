@@ -128,7 +128,7 @@ describe('Proxy + R2 logging worker', () => {
 		expect(await upstreamRequest.text()).toBe('request-body');
 
 		const urlHash = (await sha256Base64Url(incomingUrl)).slice(0, 16);
-		const prefix = `${tenantPrefix}api/invoices/${ticks}_${urlHash}`;
+		const prefix = `${tenantPrefix}api/invoices/2023-11-14T22-13-20.123Z_${urlHash}`;
 		expect(put).toHaveBeenCalledTimes(4);
 		for (const filename of ['request-headers', 'request-body', 'response-headers', 'response-body']) {
 			expect(put).toHaveBeenCalledWith(`${prefix}/${filename}.txt`, expect.any(String), {
@@ -252,7 +252,7 @@ describe('Proxy + R2 logging worker', () => {
 		const url = new URL(incomingUrl);
 		const readable = buildReadablePrefixFromPathname(url.pathname, 160);
 		const urlHash = (await sha256Base64Url(incomingUrl)).slice(0, 16);
-		const prefix = `${readable}/${ticks}_${urlHash}`;
+		const prefix = `${readable}/2023-11-14T22-13-20.123Z_${urlHash}`;
 
 		expect((fakeBucket as any).put).toHaveBeenCalledTimes(4);
 		const keys = Array.from(stored.keys()).sort();

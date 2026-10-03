@@ -14,6 +14,8 @@ Cloudflare Worker that forwards incoming HTTP requests to an upstream API and wr
   - `response-body.txt`
 
 Each log set is written under a deterministic prefix based on request path + timestamp + URL hash.
+The timestamp uses UTC ISO 8601 with colons replaced by hyphens for URL-friendly keys, preserving milliseconds:
+`api/2026-10-03T00-45-16.895Z_<url-hash>/request-headers.txt`.
 
 When `LOG_PATH_HEADER` is configured and the request includes a non-empty value
 for that header, the value becomes the first segment of the R2 log path:

@@ -65,12 +65,12 @@ function buildReadablePrefixFromPathname(pathname: string, maxLen = 160): string
 	return out.length > 0 ? out : 'root';
 }
 
-async function computeLogPrefix(requestUrl: string, ticks: number, tenantId: string | null): Promise<string> {
+async function computeLogPrefix(requestUrl: string, timestamp: string, tenantId: string | null): Promise<string> {
 	const url = new URL(requestUrl);
 	const readable = buildReadablePrefixFromPathname(url.pathname, 160);
 	const urlHash = (await sha256Base64Url(requestUrl)).slice(0, 16);
 	const tenantPrefix = tenantId ? `${safeKeySegment(tenantId)}/` : '';
-	return `${tenantPrefix}${readable}/${ticks}_${urlHash}`;
+	return `${tenantPrefix}${readable}/${timestamp}_${urlHash}`;
 }
 
 async function writeProxyLogs(params: {
@@ -139,9 +139,9 @@ export default {
 		upstreamUrl.host = baseUrl.host;
 		upstreamUrl.pathname = joinPath(baseUrl.pathname || '/', incomingUrl.pathname);
 
-		const ticks = Date.now();
+		const timestamp = new Date(Date.now()).toISOString().replace(/:/g, '-');
 		const tenantId = env.LOG_PATH_HEADER ? request.headers.get(env.LOG_PATH_HEADER) : null;
-		const logPrefixPromise = computeLogPrefix(request.url, ticks, tenantId);
+		const logPrefixPromise = computeLogPrefix(request.url, timestamp, tenantId);
 
 		const requestForUpstream = request.clone();
 		const requestForLog = request.clone();
