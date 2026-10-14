@@ -126,9 +126,7 @@ export default {
 		}
 
 		const errorPercentage = Number(env.ERROR_PERCENTAGE) || 0;
-		if (errorPercentage > 0 && Math.random() * 100 < errorPercentage) {
-			return new Response('Internal Server Error', { status: 500 });
-		}
+		const returnError = errorPercentage > 0 && Math.random() * 100 < errorPercentage;
 
 		const baseUrl = new URL(upstreamBase);
 		const incomingUrl = new URL(request.url);
@@ -162,6 +160,8 @@ export default {
 			})(),
 		);
 
-		return upstreamResponse;
+		return returnError
+			? new Response('Internal Server Error', { status: 500, headers: upstreamResponse.headers })
+			: upstreamResponse;
 	},
 } satisfies ExportedHandler<WorkerEnv>;

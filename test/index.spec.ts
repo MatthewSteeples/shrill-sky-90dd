@@ -137,20 +137,62 @@ describe('Proxy + R2 logging worker', () => {
 		}
 	});
 
-	it('returns 500 when ERROR_PERCENTAGE causes a random error', async () => {
-		vi.spyOn(Math, 'random').mockReturnValue(0.1); // 10 < 50 → error triggered
+	it.each([
+		{ percentage: 50, random: 0.1, upstreamStatus: 201 },
+		{ percentage: 100, random: 0.99, upstreamStatus: 429 },
+	])('forwards and logs the upstream response before injecting 500 at $percentage%', async ({
+		percentage,
+		random,
+		upstreamStatus,
+	}) => {
+		vi.spyOn(Math, 'random').mockReturnValue(random);
+		const upstreamResponse = new Response('upstream-body', {
+			status: upstreamStatus,
+			headers: {
+				'content-type': 'application/json',
+				'x-upstream': 'yes',
+				'retry-after': '60',
+			},
+		});
+		upstreamResponse.headers.append('set-cookie', 'first=1; Path=/');
+		upstreamResponse.headers.append('set-cookie', 'second=2; Path=/');
+		const fetchMock = vi.fn(async (_request: Request) => upstreamResponse);
+		vi.stubGlobal('fetch', fetchMock);
 
-		const fakeBucket = { put: vi.fn() } as unknown as R2Bucket;
-		const request = new IncomingRequest('http://incoming.test/api');
+		const put = vi.fn(async (_key: string, _value: string) => ({}));
+		const fakeBucket = { put } as unknown as R2Bucket;
+		const request = new IncomingRequest('http://incoming.test/api?x=1', {
+			method: 'POST',
+			headers: { 'x-request': 'yes' },
+			body: 'request-body',
+		});
 		const ctx = createExecutionContext();
 		const response = await worker.fetch(
 			request,
-			{ UPSTREAM_BASE_URL: 'https://example.com', LOGS_BUCKET: fakeBucket, ERROR_PERCENTAGE: 50 } as any,
+			{ UPSTREAM_BASE_URL: 'https://example.com/base', LOGS_BUCKET: fakeBucket, ERROR_PERCENTAGE: percentage },
 			ctx,
 		);
+		await waitOnExecutionContext(ctx);
 
 		expect(response.status).toBe(500);
 		expect(await response.text()).toBe('Internal Server Error');
+		expect([...response.headers]).toEqual([...upstreamResponse.headers]);
+		expect(response.headers.getAll('set-cookie')).toEqual(upstreamResponse.headers.getAll('set-cookie'));
+
+		expect(fetchMock).toHaveBeenCalledTimes(1);
+		const upstreamRequest = fetchMock.mock.calls[0][0];
+		expect(upstreamRequest.url).toBe('https://example.com/base/api?x=1');
+		expect(upstreamRequest.method).toBe('POST');
+		expect([...upstreamRequest.headers]).toEqual([...request.headers]);
+		expect(await upstreamRequest.text()).toBe('request-body');
+
+		expect(put).toHaveBeenCalledTimes(4);
+		const logs = new Map(put.mock.calls.map(([key, value]) => [key.slice(key.lastIndexOf('/') + 1), value]));
+		expect(logs.get('request-headers.txt')).toContain(`POST ${request.url}`);
+		expect(logs.get('request-body.txt')).toBe('request-body');
+		expect(logs.get('response-headers.txt')).toContain(String(upstreamStatus));
+		expect(logs.get('response-headers.txt')).toContain('x-upstream: yes');
+		expect(logs.get('response-body.txt')).toBe('upstream-body');
 	});
 
 	it('does not return 500 when ERROR_PERCENTAGE is 0', async () => {
