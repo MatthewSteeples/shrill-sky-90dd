@@ -20,12 +20,36 @@
 			"bucket_name": "shrill-sky-90dd-logs"
 		}
 	],
+	"previews": {
+		"vars": {
+			"UPSTREAM_BASE_URL": "https://quickbooks.api.intuit.com",
+			"ERROR_PERCENTAGE": 0
+		},
+		"r2_buckets": [
+			{
+				"binding": "LOGS_BUCKET",
+				"bucket_name": "shrill-sky-90dd-logs"
+			}
+		]
+	},
 	"env": {
 		"Qbo": {
 			"name": "shrill-sky-90dd-qbo",
 			"vars": {
 				"UPSTREAM_BASE_URL": "https://quickbooks.api.intuit.com",
 				"ERROR_PERCENTAGE": 0
+			},
+			"previews": {
+				"vars": {
+					"UPSTREAM_BASE_URL": "https://quickbooks.api.intuit.com",
+					"ERROR_PERCENTAGE": 0
+				},
+				"r2_buckets": [
+					{
+						"binding": "LOGS_BUCKET",
+						"bucket_name": "shrill-sky-90dd-qbo-logs"
+					}
+				]
 			},
 			"r2_buckets": [
 				{
@@ -36,6 +60,19 @@
 		},
 		"Xero": {
 			"name": "shrill-sky-90dd-xero",
+			"previews": {
+				"vars": {
+					"UPSTREAM_BASE_URL": "https://api.xero.com",
+					"LOG_PATH_HEADER": "Xero-tenant-id",
+					"ERROR_PERCENTAGE": 0
+				},
+				"r2_buckets": [
+					{
+						"binding": "LOGS_BUCKET",
+						"bucket_name": "shrill-sky-90dd-xero-logs"
+					}
+				]
+			},
 			"vars": {
 				"UPSTREAM_BASE_URL": "https://api.xero.com",
 				"LOG_PATH_HEADER": "Xero-tenant-id",
@@ -50,6 +87,19 @@
 		},
 		"SageCloud": {
 			"name": "shrill-sky-90dd-sagecloud",
+			"previews": {
+				"vars": {
+					"UPSTREAM_BASE_URL": "https://api.accounting.sage.com/",
+					"LOG_PATH_HEADER": "x-business",
+					"ERROR_PERCENTAGE": 0
+				},
+				"r2_buckets": [
+					{
+						"binding": "LOGS_BUCKET",
+						"bucket_name": "shrill-sky-90dd-sagecloud-logs"
+					}
+				]
+			},
 			"vars": {
 				"UPSTREAM_BASE_URL": "https://api.accounting.sage.com/",
 				"LOG_PATH_HEADER": "x-business",
