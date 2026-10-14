@@ -7,6 +7,9 @@ Cloudflare Worker that forwards incoming HTTP requests to an upstream API and wr
 - Proxies every request to `UPSTREAM_BASE_URL` while preserving method, headers, query string, and request body.
 - Rewrites protocol/host/path to the configured upstream base.
 - Returns the upstream response to the caller.
+- When `ERROR_PERCENTAGE` triggers an injected error, still forwards the request
+  and logs the original upstream response, but returns status `500` with the
+  upstream headers and `Internal Server Error` instead of the upstream body.
 - Asynchronously stores four text logs in R2 for each request:
   - `request-headers.txt`
   - `request-body.txt`
@@ -73,6 +76,9 @@ Current required bindings/config:
 
 Optional config: `LOG_PATH_HEADER` (string) selects the request header used to
 group R2 logs by company/tenant.
+`ERROR_PERCENTAGE` (number, default `0`) controls the percentage of responses
+replaced with an injected error; `100` replaces every response. Forwarding and
+logging are unaffected.
 
 ## Run locally
 
