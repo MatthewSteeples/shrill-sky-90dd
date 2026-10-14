@@ -159,6 +159,13 @@ or `--env SageCloud` flag to the preview command. For example,
 `npx wrangler preview --env Qbo`; if using `npx wrangler versions upload`,
 append the same environment flag to that command instead.
 
+The default Worker and each named environment have an explicit `previews`
+block for `wrangler preview`. Previews intentionally use the same upstream URLs
+and production R2 log buckets as their corresponding production Workers, with
+`ERROR_PERCENTAGE` set to `0` and the same tenant-header configuration.
+Preview requests therefore reach the real upstream APIs and write logs into
+the production buckets; they are not isolated from production resources.
+
 Keep runtime variables and bindings in `wrangler.jsonc`; build variables are
 only available during CI, not at runtime. Configure any runtime secrets
 separately for each Worker.
