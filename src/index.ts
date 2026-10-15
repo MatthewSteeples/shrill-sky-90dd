@@ -46,6 +46,14 @@ async function bodyToText(body: ArrayBuffer | null): Promise<string> {
 	return new TextDecoder().decode(body);
 }
 
+async function putLogFile(bucket: R2Bucket, key: string, contents: string): Promise<void> {
+	if (new TextEncoder().encode(contents).byteLength === 0) return;
+
+	await bucket.put(key, contents, {
+		httpMetadata: { contentType: 'text/plain; charset=utf-8' },
+	});
+}
+
 function safeKeySegment(value: string): string {
 	const cleaned = value.replace(/[^a-zA-Z0-9._-]+/g, '_').replace(/^_+|_+$/g, '');
 	return cleaned.length > 0 ? cleaned : 'root';
@@ -100,18 +108,10 @@ async function writeProxyLogs(params: {
 	const respBodyText = await bodyToText(respBodyBytes);
 
 	await Promise.all([
-		bucket.put(`${prefix}/request-headers.txt`, reqHeadersText, {
-			httpMetadata: { contentType: 'text/plain; charset=utf-8' },
-		}),
-		bucket.put(`${prefix}/request-body.txt`, reqBodyText, {
-			httpMetadata: { contentType: 'text/plain; charset=utf-8' },
-		}),
-		bucket.put(`${prefix}/response-headers.txt`, respHeadersText, {
-			httpMetadata: { contentType: 'text/plain; charset=utf-8' },
-		}),
-		bucket.put(`${prefix}/response-body.txt`, respBodyText, {
-			httpMetadata: { contentType: 'text/plain; charset=utf-8' },
-		}),
+		putLogFile(bucket, `${prefix}/request-headers.txt`, reqHeadersText),
+		putLogFile(bucket, `${prefix}/request-body.txt`, reqBodyText),
+		putLogFile(bucket, `${prefix}/response-headers.txt`, respHeadersText),
+		putLogFile(bucket, `${prefix}/response-body.txt`, respBodyText),
 	]);
 }
 

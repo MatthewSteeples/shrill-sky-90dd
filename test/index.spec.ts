@@ -129,12 +129,43 @@ describe('Proxy + R2 logging worker', () => {
 
 		const urlHash = (await sha256Base64Url(incomingUrl)).slice(0, 16);
 		const prefix = `${tenantPrefix}api/invoices/2023-11-14T22-13-20.123Z_${urlHash}`;
-		expect(put).toHaveBeenCalledTimes(4);
-		for (const filename of ['request-headers', 'request-body', 'response-headers', 'response-body']) {
+		expect(put).toHaveBeenCalledTimes(3);
+		for (const filename of ['request-headers', 'request-body', 'response-headers']) {
 			expect(put).toHaveBeenCalledWith(`${prefix}/${filename}.txt`, expect.any(String), {
 				httpMetadata: { contentType: 'text/plain; charset=utf-8' },
 			});
 		}
+		expect(put).not.toHaveBeenCalledWith(`${prefix}/response-body.txt`, expect.anything(), expect.anything());
+	});
+
+	it('does not write empty request or response body logs', async () => {
+		const fetchMock = vi.fn(async () => new Response(null));
+		vi.stubGlobal('fetch', fetchMock as unknown as typeof fetch);
+
+		const put = vi.fn(async (key: string) => ({ key }));
+		const fakeBucket = { put } as unknown as R2Bucket;
+		const request = new IncomingRequest('http://incoming.test/api');
+		const ctx = createExecutionContext();
+
+		await worker.fetch(
+			request,
+			{
+				UPSTREAM_BASE_URL: 'https://example.com',
+				LOGS_BUCKET: fakeBucket,
+				ERROR_PERCENTAGE: 0,
+			} as any,
+			ctx,
+		);
+		await waitOnExecutionContext(ctx);
+
+		expect(put).toHaveBeenCalledTimes(2);
+		const writtenKeys = put.mock.calls.map(([key]) => key);
+		expect(writtenKeys).toEqual(expect.arrayContaining([
+			expect.stringMatching(/\/request-headers\.txt$/),
+			expect.stringMatching(/\/response-headers\.txt$/),
+		]));
+		expect(writtenKeys.some((key) => key.endsWith('/request-body.txt'))).toBe(false);
+		expect(writtenKeys.some((key) => key.endsWith('/response-body.txt'))).toBe(false);
 	});
 
 	it.each([

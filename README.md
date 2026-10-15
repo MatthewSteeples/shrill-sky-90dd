@@ -10,11 +10,12 @@ Cloudflare Worker that forwards incoming HTTP requests to an upstream API and wr
 - When `ERROR_PERCENTAGE` triggers an injected error, still forwards the request
   and logs the original upstream response, but returns status `500` with the
   upstream headers and `Internal Server Error` instead of the upstream body.
-- Asynchronously stores four text logs in R2 for each request:
+- Asynchronously stores up to four non-empty text logs in R2 for each request:
   - `request-headers.txt`
   - `request-body.txt`
   - `response-headers.txt`
   - `response-body.txt`
+  Empty logs are skipped rather than written as zero-byte objects.
 
 Each log set is written under a deterministic prefix based on request path + timestamp + URL hash.
 The timestamp uses UTC ISO 8601 with colons replaced by hyphens for URL-friendly keys, preserving milliseconds:
