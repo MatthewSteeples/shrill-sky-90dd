@@ -41,7 +41,7 @@ unchanged. The upstream URL and forwarded headers are unaffected.
 
 ## Prerequisites
 
-- Node.js 20+ and npm
+- Node.js 22+ and npm
 - A Cloudflare account
 - Wrangler CLI (installed via project dependencies)
 - An R2 bucket for logs

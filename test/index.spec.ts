@@ -129,13 +129,12 @@ describe('Proxy + R2 logging worker', () => {
 
 		const urlHash = (await sha256Base64Url(incomingUrl)).slice(0, 16);
 		const prefix = `${tenantPrefix}api/invoices/2023-11-14T22-13-20.123Z_${urlHash}`;
-		expect(put).toHaveBeenCalledTimes(3);
-		for (const filename of ['request-headers', 'request-body', 'response-headers']) {
+		expect(put).toHaveBeenCalledTimes(4);
+		for (const filename of ['request-headers', 'request-body', 'response-headers', 'response-body']) {
 			expect(put).toHaveBeenCalledWith(`${prefix}/${filename}.txt`, expect.any(String), {
 				httpMetadata: { contentType: 'text/plain; charset=utf-8' },
 			});
 		}
-		expect(put).not.toHaveBeenCalledWith(`${prefix}/response-body.txt`, expect.anything(), expect.anything());
 	});
 
 	it('does not write empty request or response body logs', async () => {
