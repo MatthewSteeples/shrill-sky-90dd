@@ -81,13 +81,12 @@ async function computeLogPrefix(requestUrl: string, timestamp: string, tenantId:
 	return `${tenantPrefix}${readable}/${timestamp}_${urlHash}`;
 }
 
-async function writeProxyLogs(params: {
+async function writeRequestLogs(params: {
 	bucket: R2Bucket;
 	prefix: string;
 	request: Request;
-	response: Response;
 }): Promise<void> {
-	const { bucket, prefix, request, response } = params;
+	const { bucket, prefix, request } = params;
 
 	const reqHeadersText = [
 		`${request.method} ${request.url}`,
@@ -97,6 +96,19 @@ async function writeProxyLogs(params: {
 
 	const reqBodyBytes = await request.arrayBuffer().catch(() => null);
 	const reqBodyText = await bodyToText(reqBodyBytes);
+
+	await Promise.all([
+		putLogFile(bucket, `${prefix}/request-headers.txt`, reqHeadersText),
+		putLogFile(bucket, `${prefix}/request-body.txt`, reqBodyText),
+	]);
+}
+
+async function writeResponseLogs(params: {
+	bucket: R2Bucket;
+	prefix: string;
+	response: Response;
+}): Promise<void> {
+	const { bucket, prefix, response } = params;
 
 	const respHeadersText = [
 		`${response.status} ${response.statusText}`.trimEnd(),
@@ -108,8 +120,6 @@ async function writeProxyLogs(params: {
 	const respBodyText = await bodyToText(respBodyBytes);
 
 	await Promise.all([
-		putLogFile(bucket, `${prefix}/request-headers.txt`, reqHeadersText),
-		putLogFile(bucket, `${prefix}/request-body.txt`, reqBodyText),
 		putLogFile(bucket, `${prefix}/response-headers.txt`, respHeadersText),
 		putLogFile(bucket, `${prefix}/response-body.txt`, respBodyText),
 	]);
@@ -145,16 +155,26 @@ export default {
 		const requestForLog = request.clone();
 		const upstreamRequest = new Request(upstreamUrl.toString(), requestForUpstream);
 
+		ctx.waitUntil(
+			(async () => {
+				const prefix = await logPrefixPromise;
+				await writeRequestLogs({
+					bucket: env.LOGS_BUCKET,
+					prefix,
+					request: requestForLog,
+				});
+			})(),
+		);
+
 		const upstreamResponse = await fetch(upstreamRequest);
 		const responseForLog = upstreamResponse.clone();
 
 		ctx.waitUntil(
 			(async () => {
 				const prefix = await logPrefixPromise;
-				await writeProxyLogs({
+				await writeResponseLogs({
 					bucket: env.LOGS_BUCKET,
 					prefix,
-					request: requestForLog,
 					response: responseForLog,
 				});
 			})(),

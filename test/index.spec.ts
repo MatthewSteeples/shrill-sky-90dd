@@ -167,6 +167,54 @@ describe('Proxy + R2 logging worker', () => {
 		expect(writtenKeys.some((key) => key.endsWith('/response-body.txt'))).toBe(false);
 	});
 
+	it('writes request logs while the upstream response is still pending', async () => {
+		const requestLogs = new Map<string, string>();
+		let resolveRequestLogs!: () => void;
+		const requestLogsWritten = new Promise<void>((resolve) => {
+			resolveRequestLogs = resolve;
+		});
+		const fetchMock = vi.fn(async () => {
+			await requestLogsWritten;
+			return new Response('upstream-body');
+		});
+		vi.stubGlobal('fetch', fetchMock as unknown as typeof fetch);
+
+		const fakeBucket = {
+			put: vi.fn(async (key: string, value: unknown) => {
+				requestLogs.set(key, String(value ?? ''));
+				if (
+					[...requestLogs.keys()].some((item) => item.endsWith('/request-headers.txt')) &&
+					[...requestLogs.keys()].some((item) => item.endsWith('/request-body.txt'))
+				) {
+					resolveRequestLogs();
+				}
+				return { key };
+			}),
+		} as unknown as R2Bucket;
+		const request = new IncomingRequest('http://incoming.test/api', {
+			method: 'POST',
+			body: 'request-body',
+		});
+		const ctx = createExecutionContext();
+
+		const response = await worker.fetch(
+			request,
+			{
+				UPSTREAM_BASE_URL: 'https://example.com',
+				LOGS_BUCKET: fakeBucket,
+				ERROR_PERCENTAGE: 0,
+			},
+			ctx,
+		);
+		await waitOnExecutionContext(ctx);
+
+		expect(response.status).toBe(200);
+		expect(fetchMock).toHaveBeenCalledTimes(1);
+		expect([...requestLogs.keys()].some((key) => key.endsWith('/request-headers.txt'))).toBe(true);
+		expect([...requestLogs.keys()].some((key) => key.endsWith('/request-body.txt'))).toBe(true);
+		expect([...requestLogs.values()]).toContain('request-body');
+	});
+
 	it.each([
 		{ percentage: 50, random: 0.1, upstreamStatus: 201 },
 		{ percentage: 100, random: 0.99, upstreamStatus: 429 },
